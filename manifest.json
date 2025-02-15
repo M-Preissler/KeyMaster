@@ -1,0 +1,21 @@
+{
+  "name": "Key Master: 6-Color Custom Playground",
+  "short_name": "KeyMaster",
+  "description": "A customizable mechanical keyboard layout tool with 6-color cycling and drag-and-drop features.",
+  "start_url": "./!DOCTYPE html.html",
+  "display": "standalone",
+  "background_color": "#cfcfcf",
+  "theme_color": "#333333",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+ <head>
+    <link rel="manifest" href="manifest.json">
+    <meta charset="utf-8" />
+    <title>Keychron K5 SE–Style (Full Layout, Spaced Bottom Row + FN Key, Extended Colors)</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #cfcfcf;
+        font-family: Consolas;
+      }
+      #keyboard-svg {
+        background: #cfcfcf;
+        display: block;
+        margin: 0 auto; /* center horizontally */
+      }
+    </style>
+  </head>
+
+  <body>
+    <svg
+      id="keyboard-svg"
+      width="1600"
+      height="600"
+      viewBox="0 0 1600 600"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <!-- 
+        1) "Deck" (the keyboard body)
+        2) "Keys" (generated via JavaScript)
+      -->
+
+      <!-- Gradients & other reusable defs -->
+      <defs>
+        <!-- Metallic gradient for the keyboard deck -->
+        <linearGradient id="deck-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#b3b3b3" />
+          <stop offset="100%" stop-color="#888" />
+        </linearGradient>
+        
+        <!-- Soft gradient for uncolored (default) keycaps -->
+        <linearGradient id="keycap-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f2f2f2" />
+          <stop offset="100%" stop-color="#d6d6d6" />
+        </linearGradient>
+      </defs>
+
+      <!-- The keyboard's "deck" background -->
+      <rect
+        id="keyboard-deck"
+        x="20"
+        y="20"
+        width="1175"
+        height="275"
+        rx="15"
+        fill="url(#deck-gradient)"
+      />
+
+      <!-- Keys will be inserted by the script below -->
+    </svg>
+
+    <script>
+      /************************************************************
+       * 1) CLICK-TO-COLOR CYCLE
+       *    Now includes black and white in the cycle:
+       *    Red → Blue → Yellow → Orange → Black → White → back to Red
+       ************************************************************/
+      const colorCycle = ["red", "blue", "yellow", "orange", "black", "white"];
+
+      function getNextColor(currentColor) {
+        const idx = colorCycle.indexOf(currentColor);
+        return (idx < 0)
+          ? colorCycle[0] // if not recognized, start with red
+          : colorCycle[(idx + 1) % colorCycle.length];
+      }
+
+      /************************************************************
+       * 2) DRAG VS. CLICK DISTINCTION
+       ************************************************************/
+      let isMouseDown = false;
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let originalX = 0;
+      let originalY = 0;
+      let currentGroup = null;
+      const DRAG_THRESHOLD = 5;
+
+      function handleMouseDown(evt) {
+        if (evt.button !== 0) return; // left button only
+        isMouseDown = true;
+        isDragging = false;
+        currentGroup = evt.currentTarget;
+
+        // Bring the group to the front so it doesn't go behind other keys
+        currentGroup.parentNode.appendChild(currentGroup);
+
+        dragStartX = evt.clientX;
+        dragStartY = evt.clientY;
+
+        // Extract the group's current translate
+        const transform = currentGroup.getAttribute("transform");
+        const match = /translate\(([-0-9.]+),\s*([-0-9.]+)\)/.exec(transform);
+        if (match) {
+          originalX = parseFloat(match[1]);
+          originalY = parseFloat(match[2]);
+        } else {
+          originalX = 0;
+          originalY = 0;
+        }
+
+        evt.preventDefault();
+      }
+
+      function handleMouseMove(evt) {
+        if (!isMouseDown || !currentGroup) return;
+
+        const dx = evt.clientX - dragStartX;
+        const dy = evt.clientY - dragStartY;
+
+        // If we exceed the threshold, it's a drag
+        if (!isDragging && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+          isDragging = true;
+        }
+
+        if (isDragging) {
+          const newX = originalX + dx;
+          const newY = originalY + dy;
+          currentGroup.setAttribute("transform", `translate(${newX}, ${newY})`);
+        }
+      }
+
+      function handleMouseUp(evt) {
+        if (!isMouseDown || !currentGroup) return;
+
+        if (!isDragging) {
+          // It's a click => cycle color
+          cycleColorOfKey(currentGroup);
+        }
+        // Reset states
+        isMouseDown = false;
+        isDragging = false;
+        currentGroup = null;
+      }
+
+      function cycleColorOfKey(group) {
+        const rect = group.querySelector("rect");
+        if (!rect) return;
+
+        const currentFill = rect.getAttribute("fill");
+        // If it's the default gradient, treat that as "uncolored"
+        const isDefaultGrad = currentFill.includes("keycap-gradient");
+
+        let nextFill;
+        if (isDefaultGrad) {
+          // Move to first color in the cycle
+          nextFill = colorCycle[0];
+        } else {
+          nextFill = getNextColor(currentFill);
+        }
+        rect.setAttribute("fill", nextFill);
+      }
+
+      // Attach global mouse listeners
+      const svgRoot = document.getElementById("keyboard-svg");
+      svgRoot.addEventListener("mousemove", handleMouseMove);
+      svgRoot.addEventListener("mouseup", handleMouseUp);
+
+      /************************************************************
+       * 3) KEY DIMENSIONS & POSITIONS (Low-Profile Look)
+       ************************************************************/
+      const KEY_W = 40;  // key width
+      const KEY_H = 30;  // key height (slimmer for low-profile style)
+      const GAP   = 4;   // smaller gap
+      // Start offsets inside the deck
+      const START_X = 60; 
+      const START_Y = 60;
+
+      function xPos(col) {
+        return START_X + col * (KEY_W + GAP);
+      }
+      function yPos(row) {
+        return START_Y + row * (KEY_H + GAP);
+      }
+
+      /************************************************************
+       * 4) FULL KEY LAYOUT DATA (ANSI ~104 Keys)
+       *    This array covers top row (F-keys) down through arrows
+       *    and numpad. Some keys have custom w/h for extended size.
+       ************************************************************/
+      const keyboardKeys = [
+        // (Identical to your final layout version)
+        // Row 0: ESC + F1-F12
+        { label: "Esc",   x: xPos(0),   y: yPos(0) },
+        { label: "F1",    x: xPos(2),   y: yPos(0) },
+        { label: "F2",    x: xPos(3),   y: yPos(0) },
+        { label: "F3",    x: xPos(4),   y: yPos(0) },
+        { label: "F4",    x: xPos(5),   y: yPos(0) },
+        { label: "F5",    x: xPos(7),   y: yPos(0) },
+        { label: "F6",    x: xPos(8),   y: yPos(0) },
+        { label: "F7",    x: xPos(9),   y: yPos(0) },
+        { label: "F8",    x: xPos(10),  y: yPos(0) },
+        { label: "F9",    x: xPos(12),  y: yPos(0) },
+        { label: "F10",   x: xPos(13),  y: yPos(0) },
+        { label: "F11",   x: xPos(14),  y: yPos(0) },
+        { label: "F12",   x: xPos(15),  y: yPos(0) },
+
+        // Row 1: `~ 1-0 - = + Backspace + Insert/Home/PgUp
+        { label: "`~",    x: xPos(0),   y: yPos(1) },
+        { label: "1",     x: xPos(1),   y: yPos(1) },
+        { label: "2",     x: xPos(2),   y: yPos(1) },
+        { label: "3",     x: xPos(3),   y: yPos(1) },
+        { label: "4",     x: xPos(4),   y: yPos(1) },
+        { label: "5",     x: xPos(5),   y: yPos(1) },
+        { label: "6",     x: xPos(6),   y: yPos(1) },
+        { label: "7",     x: xPos(7),   y: yPos(1) },
+        { label: "8",     x: xPos(8),   y: yPos(1) },
+        { label: "9",     x: xPos(9),   y: yPos(1) },
+        { label: "0",     x: xPos(10),  y: yPos(1) },
+        { label: "-_",    x: xPos(11),  y: yPos(1) },
+        { label: "=+",    x: xPos(12),  y: yPos(1) },
+        // Backspace ~2u
+        { label: "Backspace", x: xPos(13), y: yPos(1), w: KEY_W * 2 + GAP },
+
+        { label: "Ins",   x: xPos(17),  y: yPos(1) },
+        { label: "Home",  x: xPos(18),  y: yPos(1) },
+        { label: "PgUp",  x: xPos(19),  y: yPos(1) },
+
+        // Row 2: Tab + Q..P + [ ] \ + Del/End/PgDn + some Numpad keys
+        { label: "Tab",   x: xPos(0),   y: yPos(2), w: KEY_W * 1.5 },
+        { label: "Q",     x: xPos(1)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "W",     x: xPos(2)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "E",     x: xPos(3)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "R",     x: xPos(4)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "T",     x: xPos(5)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "Y",     x: xPos(6)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "U",     x: xPos(7)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "I",     x: xPos(8)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "O",     x: xPos(9)+KEY_W*0.5+GAP*0.5, y: yPos(2) },
+        { label: "P",     x: xPos(10)+KEY_W*0.5+GAP*0.5,y: yPos(2) },
+        { label: "[{",    x: xPos(11)+KEY_W*0.5+GAP*0.5,y: yPos(2) },
+        { label: "]}",    x: xPos(12)+KEY_W*0.5+GAP*0.5,y: yPos(2) },
+        // Backslash ~1.5u
+        { label: "\\|",   x: xPos(13)+KEY_W*0.5+GAP*0.5, y: yPos(2), w: KEY_W*1.5+GAP },
+
+        { label: "Del",   x: xPos(17),  y: yPos(2) },
+        { label: "End",   x: xPos(18),  y: yPos(2) },
+        { label: "PgDn",  x: xPos(19),  y: yPos(2) },
+
+        // Numpad top row
+        { label: "Num",   x: xPos(21),  y: yPos(1) },
+        { label: "/",     x: xPos(22),  y: yPos(1) },
+        { label: "*",     x: xPos(23),  y: yPos(1) },
+        { label: "-",     x: xPos(24),  y: yPos(1) },
+
+        // Numpad second row (7,8,9, + tall & skinny)
+        { label: "7",     x: xPos(21),  y: yPos(2) },
+        { label: "8",     x: xPos(22),  y: yPos(2) },
+        { label: "9",     x: xPos(23),  y: yPos(2) },
+        { label: "+",     x: xPos(24),  y: yPos(2), w: KEY_W*0.95, h: KEY_H*2 + GAP },
+
+        // Row 3: Caps + A..; + ' + Enter + Numpad 4/5/6
+        { label: "Caps",  x: xPos(0),  y: yPos(3), w: KEY_W*1.75 },
+        { label: "A",     x: xPos(1)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "S",     x: xPos(2)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "D",     x: xPos(3)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "F",     x: xPos(4)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "G",     x: xPos(5)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "H",     x: xPos(6)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "J",     x: xPos(7)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "K",     x: xPos(8)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: "L",     x: xPos(9)+ KEY_W*0.75+GAP*0.75, y: yPos(3) },
+        { label: ";:",    x: xPos(10)+KEY_W*0.75+GAP*0.75,y: yPos(3) },
+        { label: "'",     x: xPos(11)+KEY_W*0.75+GAP*0.75,y: yPos(3) },
+        // Enter ~2.25u
+        { label: "Enter", x: xPos(12)+KEY_W*0.75+GAP*0.75,y: yPos(3), w: KEY_W*2.25+GAP*1.25 },
+
+        { label: "4",     x: xPos(21),  y: yPos(3) },
+        { label: "5",     x: xPos(22),  y: yPos(3) },
+        { label: "6",     x: xPos(23),  y: yPos(3) },
+
+        // Row 4: Shift + Z.. / + Shift + Numpad 1/2/3/Enter
+        { label: "Shift", x: xPos(0),  y: yPos(4), w: KEY_W*2.25 },
+        { label: "Z",     x: xPos(1)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "X",     x: xPos(2)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "C",     x: xPos(3)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "V",     x: xPos(4)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "B",     x: xPos(5)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "N",     x: xPos(6)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "M",     x: xPos(7)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: ",<",    x: xPos(8)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: ".>",    x: xPos(9)+ KEY_W*1.25+GAP*1.25, y: yPos(4) },
+        { label: "/?",    x: xPos(10)+KEY_W*1.25+GAP*1.25,y: yPos(4) },
+        // RShift ~2.75u
+        { label: "Shift", x: xPos(11)+KEY_W*1.25+GAP*1.25,y: yPos(4), w: KEY_W*2.75+GAP*1.75 },
+
+        { label: "1",     x: xPos(21),  y: yPos(4) },
+        { label: "2",     x: xPos(22),  y: yPos(4) },
+        { label: "3",     x: xPos(23),  y: yPos(4) },
+        // Numpad Enter ~2u tall
+        { label: "Enter", x: xPos(24),  y: yPos(4), w: KEY_W*0.95, h: KEY_H*2 + GAP },
+
+        // Row 5: Bottom row (Ctrl, Win, Alt, Space, Alt, FN, Menu, Ctrl) + Arrows + Numpad
+        { label: "Ctrl",  x: xPos(0),     y: yPos(5), w: KEY_W*1.05+ GAP },
+        { label: "Win",   x: xPos(1.25),  y: yPos(5), w: KEY_W*1.05+ GAP },
+        { label: "Alt",   x: xPos(2.5),   y: yPos(5), w: KEY_W*1.05+ GAP },
+        // Space ~6u
+        { label: "Space", x: xPos(3.75),  y: yPos(5), w: KEY_W*6 + GAP*4 },
+        { label: "Alt",   x: xPos(9.75),  y: yPos(5), w: KEY_W*1.05+ GAP },
+        { label: "FN",    x: xPos(11),    y: yPos(5), w: KEY_W*1.05+ GAP },
+        { label: "Menu",  x: xPos(12.25), y: yPos(5), w: KEY_W*1.05+ GAP },
+        { label: "Ctrl",  x: xPos(13.50), y: yPos(5), w: KEY_W*1.05+ GAP },
+
+        // Arrows near col 17-19
+        { label: "Up",    x: xPos(18),    y: yPos(4) },
+        { label: "Left",  x: xPos(17),    y: yPos(5) },
+        { label: "Down",  x: xPos(18),    y: yPos(5) },
+        { label: "Right", x: xPos(19),    y: yPos(5) },
+
+        // Numpad bottom row
+        { label: "0",     x: xPos(21),    y: yPos(5), w: KEY_W*2 + GAP },
+        { label: ".",     x: xPos(23),    y: yPos(5) }
+      ];
+
+      /************************************************************
+       * 5) CREATE <g> FOR EACH KEY (Draggable + Colorable)
+       ************************************************************/
+      function createKeyGroup(keyData) {
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        
+        // If w or h is unspecified, use defaults
+        const w = keyData.w || KEY_W;
+        const h = keyData.h || KEY_H;
+
+        // Transform to position the group
+        group.setAttribute("transform", `translate(${keyData.x}, ${keyData.y})`);
+        group.style.cursor = "move";
+        group.addEventListener("mousedown", handleMouseDown);
+
+        // Key rectangle
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("width", w);
+        rect.setAttribute("height", h);
+        rect.setAttribute("rx", 3); // slight rounding
+        rect.setAttribute("fill", "url(#keycap-gradient)");
+        rect.setAttribute("stroke", "#999");
+        rect.setAttribute("stroke-width", "1");
+
+        // Text label
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", w / 2);
+        text.setAttribute("y", h / 2 + 5);
+        text.setAttribute("fill", "#333");
+        text.setAttribute("font-size", "12");
+        text.setAttribute("text-anchor", "middle");
+        text.style.userSelect = "none";
+        text.textContent = keyData.label;
+
+        group.appendChild(rect);
+        group.appendChild(text);
+
+        return group;
+      }
+
+      // Create each key group and append on top of the deck
+      const deck = document.getElementById("keyboard-deck");
+      keyboardKeys.forEach((k) => {
+        const g = createKeyGroup(k);
+        deck.parentNode.appendChild(g);
+      });
+
+      // A small label at the bottom
+      const info = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      info.setAttribute("x", 40);
+      info.setAttribute("y", 595);
+      info.setAttribute("fill", "#444");
+      info.setAttribute("font-size", "18");
+      info.textContent =
+        "Marcelo's custom keycap color layout.";
+      deck.parentNode.appendChild(info);
+    </script>
+  </body>
+</html>
